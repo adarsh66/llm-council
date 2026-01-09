@@ -10,9 +10,15 @@ export default function Sidebar({
   return (
     <div className="sidebar">
       <div className="sidebar-header">
-        <h1>LLM Council</h1>
+        <div className="app-logo">
+          <span className="logo-icon">⚖️</span>
+          <h1>AI Expert Council</h1>
+        </div>
         <button className="new-conversation-btn" onClick={onNewConversation}>
-          + New Conversation
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          Talk to the Council
         </button>
       </div>
 

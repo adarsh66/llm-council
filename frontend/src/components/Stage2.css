@@ -1,12 +1,36 @@
+/* ─── Stage 2: Purple tint differentiation ─── */
 .stage2 {
-  background: #fafafa;
+  background: var(--color-accent-purple-bg);
+  border-color: var(--color-accent-purple-border);
+}
+
+.stage2::before {
+  background: var(--color-accent-purple);
+}
+
+.stage2 .stage-badge {
+  background: var(--color-accent-purple);
+}
+
+.stage2 .model-name::before {
+  background: var(--color-accent-purple);
+}
+
+.stage2 .stage-inner {
+  background: var(--color-surface);
+  margin: 0 var(--space-md) var(--space-md) calc(var(--space-md) + 4px);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-light);
+  padding: var(--space-lg);
 }
 
 .stage2 h4 {
-  margin: 20px 0 8px 0;
-  color: #333;
-  font-size: 14px;
+  margin: var(--space-lg) 0 var(--space-sm) 0;
+  color: var(--color-text);
+  font-size: 13px;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .stage2 h4:first-of-type {
@@ -14,140 +38,176 @@
 }
 
 .stage-description {
-  margin: 0 0 12px 0;
-  color: #666;
+  margin: 0 0 var(--space-md) 0;
+  color: var(--color-text-secondary);
   font-size: 13px;
   line-height: 1.5;
 }
 
+/* ─── Aggregate rankings card ─── */
 .aggregate-rankings {
-  background: #f0f7ff;
-  padding: 16px;
-  border-radius: 8px;
-  margin-bottom: 20px;
-  border: 2px solid #d0e7ff;
+  background: linear-gradient(135deg, var(--color-accent-purple-bg) 0%, var(--color-primary-bg) 100%);
+  padding: var(--space-lg);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-lg);
+  border: 1px solid var(--color-accent-purple-border);
 }
 
 .aggregate-rankings h4 {
-  margin: 0 0 12px 0;
-  color: #2a7ae2;
-  font-size: 15px;
+  margin: 0 0 var(--space-sm) 0;
+  color: var(--color-accent-purple);
+  font-size: 14px;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .aggregate-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .aggregate-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px;
-  background: #ffffff;
-  border-radius: 6px;
-  border: 1px solid #d0e7ff;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-light);
+  transition: all 0.15s ease;
+}
+
+.aggregate-item:hover {
+  border-color: var(--color-accent-purple-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.aggregate-item:first-child {
+  background: linear-gradient(135deg, #fef9e7 0%, #fff9e6 100%);
+  border-color: #f7dc6f;
+}
+
+.aggregate-item:first-child .rank-position {
+  color: #d4a10a;
 }
 
 .rank-position {
-  color: #2a7ae2;
+  color: var(--color-accent-purple);
   font-weight: 700;
   font-size: 16px;
-  min-width: 35px;
+  min-width: 32px;
 }
 
 .rank-model {
   flex: 1;
-  color: #333;
-  font-family: monospace;
-  font-size: 14px;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 13px;
   font-weight: 500;
 }
 
 .rank-score {
-  color: #666;
-  font-size: 13px;
-  font-family: monospace;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-family: var(--font-mono);
 }
 
+.rank-count {
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+/* ─── Stage 2 tabs (inherit base, minor overrides) ─── */
 .stage2 .tabs {
   display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border-light);
   flex-wrap: wrap;
 }
 
 .stage2 .tab {
-  padding: 8px 16px;
-  background: #ffffff;
-  border: 1px solid #d0d0d0;
-  border-radius: 6px 6px 0 0;
-  color: #666;
+  padding: var(--space-sm) var(--space-md);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
   cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.15s ease;
 }
 
 .stage2 .tab:hover {
-  background: #f0f0f0;
-  color: #333;
-  border-color: #4a90e2;
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
 .stage2 .tab.active {
-  background: #ffffff;
-  color: #4a90e2;
-  border-color: #4a90e2;
-  border-bottom-color: #ffffff;
+  background: var(--color-surface);
+  color: var(--color-accent-purple);
+  border-color: var(--color-accent-purple-border);
   font-weight: 600;
 }
 
 .stage2 .tab-content {
-  background: #ffffff;
-  padding: 16px;
-  border-radius: 6px;
-  border: 1px solid #e0e0e0;
-  margin-bottom: 20px;
+  background: var(--color-surface);
+  padding: var(--space-lg);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-light);
+  margin-bottom: var(--space-lg);
 }
 
 .ranking-model {
-  color: #888;
+  color: var(--color-text-muted);
   font-size: 12px;
-  font-family: monospace;
-  margin-bottom: 12px;
+  font-family: var(--font-mono);
+  margin-bottom: var(--space-md);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.ranking-model::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  background: var(--color-accent-purple);
+  border-radius: 50%;
 }
 
 .ranking-content {
-  color: #333;
-  line-height: 1.6;
+  color: var(--color-text);
+  line-height: 1.7;
   font-size: 14px;
 }
 
 .parsed-ranking {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 2px solid #e0e0e0;
+  margin-top: var(--space-lg);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--color-border);
 }
 
 .parsed-ranking strong {
-  color: #2a7ae2;
-  font-size: 13px;
+  color: var(--color-accent-purple);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .parsed-ranking ol {
-  margin: 8px 0 0 0;
-  padding-left: 24px;
-  color: #333;
+  margin: var(--space-sm) 0 0 0;
+  padding-left: var(--space-xl);
+  color: var(--color-text);
 }
 
 .parsed-ranking li {
-  margin: 4px 0;
-  font-family: monospace;
+  margin: var(--space-xs) 0;
+  font-family: var(--font-mono);
   font-size: 13px;
 }
-
-.rank-count {
   color: #999;
   font-size: 12px;
 }

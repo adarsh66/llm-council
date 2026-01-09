@@ -1,65 +1,118 @@
+/* ─── Shared stage card base ─── */
 .stage {
-  margin: 24px 0;
-  padding: 20px;
-  background: #fafafa;
-  border-radius: 8px;
-  border: 1px solid #e0e0e0;
+  margin: var(--space-lg) 0;
+  padding: 0;
+  background: var(--color-accent-blue-bg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-accent-blue-border);
+  overflow: hidden;
+  position: relative;
+}
+
+.stage::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--color-accent-blue);
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+}
+
+.stage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md) var(--space-lg);
+  padding-left: calc(var(--space-lg) + 4px);
+  background: transparent;
 }
 
 .stage-title {
-  margin: 0 0 16px 0;
-  color: #333;
-  font-size: 16px;
+  margin: 0;
+  color: var(--color-text);
+  font-size: 14px;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
 }
 
+.stage-badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--color-accent-blue);
+  color: #fff;
+}
+
+.stage-inner {
+  background: var(--color-surface);
+  margin: 0 var(--space-md) var(--space-md) calc(var(--space-md) + 4px);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-light);
+}
+
+/* ─── Tabs ─── */
 .tabs {
   display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border-light);
   flex-wrap: wrap;
 }
 
 .tab {
-  padding: 8px 16px;
-  background: #ffffff;
-  border: 1px solid #d0d0d0;
-  border-radius: 6px 6px 0 0;
-  color: #666;
+  padding: var(--space-sm) var(--space-md);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
   cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.15s ease;
 }
 
 .tab:hover {
-  background: #f0f0f0;
-  color: #333;
-  border-color: #4a90e2;
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
 .tab.active {
-  background: #ffffff;
-  color: #4a90e2;
-  border-color: #4a90e2;
-  border-bottom-color: #ffffff;
+  background: var(--color-surface);
+  color: var(--color-primary);
+  border-color: var(--color-primary-border);
   font-weight: 600;
 }
 
+/* ─── Tab content ─── */
 .tab-content {
-  background: #ffffff;
-  padding: 16px;
-  border-radius: 6px;
-  border: 1px solid #e0e0e0;
+  padding: var(--space-lg);
 }
 
 .model-name {
-  color: #888;
+  color: var(--color-text-muted);
   font-size: 12px;
-  margin-bottom: 12px;
-  font-family: monospace;
+  margin-bottom: var(--space-md);
+  font-family: var(--font-mono);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.model-name::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  background: var(--color-accent-blue);
+  border-radius: 50%;
 }
 
 .response-text {
-  color: #333;
-  line-height: 1.6;
+  color: var(--color-text);
+  line-height: 1.7;
 }

@@ -1,25 +1,56 @@
+/* ─── Stage 3: Green tint for final answer ─── */
 .stage3 {
-  background: #f0fff0;
-  border-color: #c8e6c8;
+  background: var(--color-accent-green-bg);
+  border-color: var(--color-accent-green-border);
+}
+
+.stage3::before {
+  background: var(--color-accent-green);
+}
+
+.stage3 .stage-badge {
+  background: var(--color-accent-green);
+}
+
+.stage3 .stage-inner {
+  background: var(--color-surface);
+  margin: 0 var(--space-md) var(--space-md) calc(var(--space-md) + 4px);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-light);
+  padding: 0;
 }
 
 .final-response {
-  background: #ffffff;
-  padding: 20px;
-  border-radius: 6px;
-  border: 1px solid #c8e6c8;
+  padding: var(--space-lg);
 }
 
 .chairman-label {
-  color: #2d8a2d;
+  color: var(--color-accent-green);
   font-size: 12px;
-  font-family: monospace;
-  margin-bottom: 12px;
+  font-family: var(--font-mono);
+  margin-bottom: var(--space-md);
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.chairman-label::before {
+  content: '✓';
+  width: 18px;
+  height: 18px;
+  background: var(--color-accent-green);
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
 }
 
 .final-text {
-  color: #333;
+  color: var(--color-text);
   line-height: 1.7;
   font-size: 15px;
 }
