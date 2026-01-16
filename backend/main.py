@@ -2,22 +2,34 @@
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List, Dict, Any
 import uuid
 import json
 import asyncio
+from pathlib import Path
 
 from . import storage
-from .council import run_full_council, generate_conversation_title, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings
+from .council import (
+    run_full_council,
+    generate_conversation_title,
+    stage1_collect_responses,
+    stage2_collect_rankings,
+    stage3_synthesize_final,
+    calculate_aggregate_rankings,
+)
 
 app = FastAPI(title="LLM Council API")
+
+_STATIC_DIR = Path(__file__).resolve().parent / "static"
+_INDEX_HTML = _STATIC_DIR / "index.html"
 
 # Enable CORS for local development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=["*"],  # Allow all origins for local development
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -26,16 +38,19 @@ app.add_middleware(
 
 class CreateConversationRequest(BaseModel):
     """Request to create a new conversation."""
+
     pass
 
 
 class SendMessageRequest(BaseModel):
     """Request to send a message in a conversation."""
+
     content: str
 
 
 class ConversationMetadata(BaseModel):
     """Conversation metadata for list view."""
+
     id: str
     created_at: str
     title: str
@@ -44,15 +59,24 @@ class ConversationMetadata(BaseModel):
 
 class Conversation(BaseModel):
     """Full conversation with all messages."""
+
     id: str
     created_at: str
     title: str
     messages: List[Dict[str, Any]]
 
 
+@app.get("/api/health")
+async def health():
+    """Health check endpoint (safe for SPA root)."""
+    return {"status": "ok", "service": "LLM Council API"}
+
+
 @app.get("/")
 async def root():
-    """Health check endpoint."""
+    """Serve SPA if built assets exist; otherwise return health JSON."""
+    if _INDEX_HTML.exists():
+        return FileResponse(_INDEX_HTML)
     return {"status": "ok", "service": "LLM Council API"}
 
 
@@ -77,6 +101,16 @@ async def get_conversation(conversation_id: str):
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
     return conversation
+
+
+@app.delete("/api/conversations/{conversation_id}")
+async def delete_conversation(conversation_id: str):
+    """Delete a conversation and its stored data."""
+    deleted = storage.delete_conversation(conversation_id)
+    if not deleted:
+        # Idempotent: deleting a non-existent conversation returns 204 as well
+        return {"status": "ok"}
+    return {"status": "ok"}
 
 
 @app.post("/api/conversations/{conversation_id}/message")
@@ -108,10 +142,7 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
 
     # Add assistant message with all stages
     storage.add_assistant_message(
-        conversation_id,
-        stage1_results,
-        stage2_results,
-        stage3_result
+        conversation_id, stage1_results, stage2_results, stage3_result
     )
 
     # Return the complete response with metadata
@@ -119,7 +150,7 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
         "stage1": stage1_results,
         "stage2": stage2_results,
         "stage3": stage3_result,
-        "metadata": metadata
+        "metadata": metadata,
     }
 
 
@@ -145,7 +176,9 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
             # Start title generation in parallel (don't await yet)
             title_task = None
             if is_first_message:
-                title_task = asyncio.create_task(generate_conversation_title(request.content))
+                title_task = asyncio.create_task(
+                    generate_conversation_title(request.content)
+                )
 
             # Stage 1: Collect responses
             yield f"data: {json.dumps({'type': 'stage1_start'})}\n\n"
@@ -154,13 +187,27 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
 
             # Stage 2: Collect rankings
             yield f"data: {json.dumps({'type': 'stage2_start'})}\n\n"
-            stage2_results, label_to_model = await stage2_collect_rankings(request.content, stage1_results)
-            aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
-            yield f"data: {json.dumps({'type': 'stage2_complete', 'data': stage2_results, 'metadata': {'label_to_model': label_to_model, 'aggregate_rankings': aggregate_rankings}})}\n\n"
+            stage2_results, label_to_model = await stage2_collect_rankings(
+                request.content, stage1_results
+            )
+            aggregate_rankings = calculate_aggregate_rankings(
+                stage2_results, label_to_model
+            )
+            stage2_payload = {
+                "type": "stage2_complete",
+                "data": stage2_results,
+                "metadata": {
+                    "label_to_model": label_to_model,
+                    "aggregate_rankings": aggregate_rankings,
+                },
+            }
+            yield f"data: {json.dumps(stage2_payload)}\n\n"
 
             # Stage 3: Synthesize final answer
             yield f"data: {json.dumps({'type': 'stage3_start'})}\n\n"
-            stage3_result = await stage3_synthesize_final(request.content, stage1_results, stage2_results)
+            stage3_result = await stage3_synthesize_final(
+                request.content, stage1_results, stage2_results
+            )
             yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
 
             # Wait for title generation if it was started
@@ -171,10 +218,7 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
 
             # Save complete assistant message
             storage.add_assistant_message(
-                conversation_id,
-                stage1_results,
-                stage2_results,
-                stage3_result
+                conversation_id, stage1_results, stage2_results, stage3_result
             )
 
             # Send completion event
@@ -190,10 +234,18 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-        }
+        },
     )
 
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8001)
+
+
+# Mount static assets for single-host deployment (after API routes).
+# This only takes effect when `backend/static/index.html` exists (i.e., after
+# building the frontend and copying it into place).
+if _STATIC_DIR.exists():
+    app.mount("/", StaticFiles(directory=str(_STATIC_DIR), html=True), name="static")

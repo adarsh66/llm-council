@@ -9,6 +9,7 @@ function App() {
   const [conversations, setConversations] = useState([]);
   const [currentConversationId, setCurrentConversationId] = useState(null);
   const [currentConversation, setCurrentConversation] = useState(null);
+  const [conversationModes, setConversationModes] = useState({}); // { [id]: 'council'|'dxo'|'sequential'|'ensemble' }
   const [isLoading, setIsLoading] = useState(false);
   const [theme, setTheme] = useState(() => {
     // Check localStorage or system preference
@@ -65,6 +66,7 @@ function App() {
         ...conversations,
       ]);
       setCurrentConversationId(newConv.id);
+      setConversationModes((prev) => ({ ...prev, [newConv.id]: 'council' }));
     } catch (error) {
       console.error('Failed to create conversation:', error);
     }
@@ -74,11 +76,31 @@ function App() {
     setCurrentConversationId(id);
   };
 
+  const handleDeleteConversation = async (id) => {
+    const confirm = window.confirm('Delete this conversation? This cannot be undone.');
+    if (!confirm) return;
+    try {
+      await api.deleteConversation(id);
+      // Optimistically update list
+      setConversations((prev) => prev.filter((c) => c.id !== id));
+      // If current is deleted, clear selection and detail
+      if (currentConversationId === id) {
+        setCurrentConversationId(null);
+        setCurrentConversation(null);
+      }
+    } catch (error) {
+      console.error('Failed to delete conversation:', error);
+      // Fallback: reload conversations from server
+      await loadConversations();
+    }
+  };
+
   const handleSendMessage = async (content) => {
     if (!currentConversationId) return;
 
     setIsLoading(true);
     try {
+      const mode = conversationModes[currentConversationId] || 'council';
       // Optimistically add user message to UI
       const userMessage = { role: 'user', content };
       setCurrentConversation((prev) => ({
@@ -107,7 +129,7 @@ function App() {
       }));
 
       // Send message with streaming
-      await api.sendMessageStream(currentConversationId, content, (eventType, event) => {
+      await api.sendMessageStream(currentConversationId, content, { mode }, (eventType, event) => {
         switch (eventType) {
           case 'stage1_start':
             setCurrentConversation((prev) => {
@@ -198,6 +220,11 @@ function App() {
     }
   };
 
+  const handleChangeMode = (mode) => {
+    if (!currentConversationId) return;
+    setConversationModes((prev) => ({ ...prev, [currentConversationId]: mode }));
+  };
+
   return (
     <div className="app">
       <ThemeToggle theme={theme} onToggle={toggleTheme} />
@@ -206,11 +233,14 @@ function App() {
         currentConversationId={currentConversationId}
         onSelectConversation={handleSelectConversation}
         onNewConversation={handleNewConversation}
+        onDeleteConversation={handleDeleteConversation}
       />
       <ChatInterface
         conversation={currentConversation}
         onSendMessage={handleSendMessage}
         isLoading={isLoading}
+        mode={currentConversationId ? (conversationModes[currentConversationId] || 'council') : 'council'}
+        onChangeMode={handleChangeMode}
       />
     </div>
   );

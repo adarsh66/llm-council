@@ -2,7 +2,7 @@
 
 ![llmcouncil](header.jpg)
 
-The idea of this repo is that instead of asking a question to your favorite LLM provider (e.g. OpenAI GPT 5.1, Google Gemini 3.0 Pro, Anthropic Claude Sonnet 4.5, xAI Grok 4, eg.c), you can group them into your "LLM Council". This repo is a simple, local web app that essentially looks like ChatGPT except it uses OpenRouter to send your query to multiple LLMs, it then asks them to review and rank each other's work, and finally a Chairman LLM produces the final response.
+The idea of this repo is that instead of asking a question to your favorite LLM provider, you can group them into your "LLM Council". This repo is a simple, local web app that essentially looks like ChatGPT except it uses Azure AI Foundry to send your query to multiple LLMs, it then asks them to review and rank each other's work, and finally a Chairman LLM produces the final response.
 
 In a bit more detail, here is what happens when you submit a query:
 
@@ -32,15 +32,21 @@ npm install
 cd ..
 ```
 
-### 2. Configure API Key
+### 2. Configure Azure AI Foundry
 
 Create a `.env` file in the project root:
 
 ```bash
-OPENROUTER_API_KEY=sk-or-v1-...
+AZURE_INFERENCE_ENDPOINT=https://<your-resource>.models.ai.azure.com
 ```
 
-Get your API key at [openrouter.ai](https://openrouter.ai/). Make sure to purchase the credits you need, or sign up for automatic top up.
+Get your endpoint URL from [Azure AI Foundry](https://ai.azure.com/). Deploy the models you want to use in your council.
+
+**Authentication:** The backend uses `DefaultAzureCredential` from the Azure SDK. Before running, authenticate via:
+
+```bash
+az login
+```
 
 ### 3. Configure Models (Optional)
 
@@ -48,14 +54,17 @@ Edit `backend/config.py` to customize the council:
 
 ```python
 COUNCIL_MODELS = [
-    "openai/gpt-5.1",
-    "google/gemini-3-pro-preview",
-    "anthropic/claude-sonnet-4.5",
-    "x-ai/grok-4",
+    "phi-4",
+    "gpt-5-mini",
+    "gpt-4.1",
+    "deepseek-r1",
 ]
 
-CHAIRMAN_MODEL = "google/gemini-3-pro-preview"
+CHAIRMAN_MODEL = "gpt-5"
+TITLE_MODEL = "gpt-5-mini"
 ```
+
+Use the model names as deployed in your Azure AI Foundry resource.
 
 ## Running the Application
 
@@ -81,7 +90,7 @@ Then open http://localhost:5173 in your browser.
 
 ## Tech Stack
 
-- **Backend:** FastAPI (Python 3.10+), async httpx, OpenRouter API
+- **Backend:** FastAPI (Python 3.10+), Azure AI Inference SDK, DefaultAzureCredential
 - **Frontend:** React + Vite, react-markdown for rendering
 - **Storage:** JSON files in `data/conversations/`
 - **Package Management:** uv for Python, npm for JavaScript

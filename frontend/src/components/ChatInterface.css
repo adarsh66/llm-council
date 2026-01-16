@@ -7,6 +7,44 @@
   overflow: hidden;
 }
 
+.chat-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-xl) 0 var(--space-xl);
+}
+
+.mode-toggle {
+  display: inline-flex;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.mode-btn {
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.mode-btn.active {
+  background: var(--color-primary-bg);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.mode-btn:not(.active):hover {
+  background: var(--color-bg);
+}
+
+.mode-hint {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
 .messages-container {
   flex: 1;
   overflow-y: auto;

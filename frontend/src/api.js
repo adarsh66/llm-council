@@ -49,6 +49,25 @@ export const api = {
   },
 
   /**
+   * Delete a specific conversation.
+   */
+  async deleteConversation(conversationId) {
+    const response = await fetch(
+      `${API_BASE}/api/conversations/${conversationId}`,
+      { method: 'DELETE' }
+    );
+    if (!response.ok) {
+      throw new Error('Failed to delete conversation');
+    }
+    // Return JSON if provided; ignore otherwise
+    try {
+      return await response.json();
+    } catch (_) {
+      return { status: 'ok' };
+    }
+  },
+
+  /**
    * Send a message in a conversation.
    */
   async sendMessage(conversationId, content) {
@@ -75,7 +94,11 @@ export const api = {
    * @param {function} onEvent - Callback function for each event: (eventType, data) => void
    * @returns {Promise<void>}
    */
-  async sendMessageStream(conversationId, content, onEvent) {
+  async sendMessageStream(conversationId, content, onEventOrOptions, maybeOnEvent) {
+    // Support both (id, content, onEvent) and (id, content, options, onEvent)
+    const hasOptions = typeof onEventOrOptions === 'object' && onEventOrOptions !== null && typeof maybeOnEvent === 'function';
+    const onEvent = hasOptions ? maybeOnEvent : onEventOrOptions;
+    const options = hasOptions ? onEventOrOptions : {};
     const response = await fetch(
       `${API_BASE}/api/conversations/${conversationId}/message/stream`,
       {
@@ -83,7 +106,7 @@ export const api = {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, ...options }),
       }
     );
 
