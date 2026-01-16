@@ -1,11 +1,11 @@
 /* ─── Stage 2: Purple tint differentiation ─── */
 .stage2 {
-  background: var(--color-accent-purple-bg);
-  border-color: var(--color-accent-purple-border);
+  background: var(--color-surface-elevated);
+  border-color: var(--color-border);
 }
 
 .stage2::before {
-  background: var(--color-accent-purple);
+  background: linear-gradient(180deg, var(--color-accent-purple) 0%, transparent 100%);
 }
 
 .stage2 .stage-badge {
@@ -18,10 +18,10 @@
 
 .stage2 .stage-inner {
   background: var(--color-surface);
-  margin: 0 var(--space-md) var(--space-md) calc(var(--space-md) + 4px);
-  border-radius: var(--radius-sm);
+  margin: 0 var(--space-lg) var(--space-lg) calc(var(--space-lg) + 6px);
+  border-radius: var(--radius-md);
   border: 1px solid var(--color-border-light);
-  padding: var(--space-lg);
+  padding: var(--space-xl);
 }
 
 .stage2 h4 {
@@ -122,8 +122,8 @@
 .stage2 .tabs {
   display: flex;
   gap: var(--space-xs);
-  padding: var(--space-sm) var(--space-md);
-  background: var(--color-bg);
+  padding: var(--space-sm) var(--space-lg);
+  background: linear-gradient(180deg, var(--color-bg), transparent);
   border-bottom: 1px solid var(--color-border-light);
   flex-wrap: wrap;
 }
@@ -154,8 +154,8 @@
 
 .stage2 .tab-content {
   background: var(--color-surface);
-  padding: var(--space-lg);
-  border-radius: var(--radius-sm);
+  padding: var(--space-xl);
+  border-radius: var(--radius-md);
   border: 1px solid var(--color-border-light);
   margin-bottom: var(--space-lg);
 }
@@ -208,6 +208,4 @@
   font-family: var(--font-mono);
   font-size: 13px;
 }
-  color: #999;
-  font-size: 12px;
-}
+

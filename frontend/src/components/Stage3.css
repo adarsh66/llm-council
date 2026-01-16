@@ -1,11 +1,11 @@
 /* ─── Stage 3: Green tint for final answer ─── */
 .stage3 {
-  background: var(--color-accent-green-bg);
-  border-color: var(--color-accent-green-border);
+  background: var(--color-surface-elevated);
+  border-color: var(--color-border);
 }
 
 .stage3::before {
-  background: var(--color-accent-green);
+  background: linear-gradient(180deg, var(--color-accent-green) 0%, transparent 100%);
 }
 
 .stage3 .stage-badge {
@@ -14,14 +14,14 @@
 
 .stage3 .stage-inner {
   background: var(--color-surface);
-  margin: 0 var(--space-md) var(--space-md) calc(var(--space-md) + 4px);
-  border-radius: var(--radius-sm);
+  margin: 0 var(--space-lg) var(--space-lg) calc(var(--space-lg) + 6px);
+  border-radius: var(--radius-md);
   border: 1px solid var(--color-border-light);
   padding: 0;
 }
 
 .final-response {
-  padding: var(--space-lg);
+  padding: var(--space-xl);
 }
 
 .chairman-label {

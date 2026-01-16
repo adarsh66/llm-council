@@ -90,31 +90,54 @@ export default function ChatInterface({
   return (
     <div className="chat-interface">
       <div className="chat-header">
-        <div className="mode-toggle" role="group" aria-label="Collaboration mode">
-          {[
-            { key: 'council', label: 'Council' },
-            { key: 'dxo', label: 'DxO' },
-            { key: 'sequential', label: 'Sequential' },
-            { key: 'ensemble', label: 'Ensemble' },
-          ].map(({ key, label }) => (
-            <button
-              key={key}
-              className={`mode-btn ${mode === key ? 'active' : ''}`}
-              aria-pressed={mode === key}
-              onClick={() => onChangeMode && onChangeMode(key)}
-              disabled={isLoading}
-              title={
-                key === 'council' ? 'Parallel responses + peer ranking + synthesis' :
-                key === 'dxo' ? 'Decision orchestration with criteria, options, evaluations, risks' :
-                key === 'sequential' ? 'Pass the evolving answer through models iteratively' :
-                'Independent outputs combined via weighted ensemble'
-              }
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className="mode-hint">Mode: {mode.charAt(0).toUpperCase() + mode.slice(1)}</div>
+        {(() => {
+          const modes = [
+            {
+              key: 'council',
+              label: 'Council',
+              desc: 'Parallel answers, peer ranking, and synthesis',
+              icon: '⚖️',
+            },
+            {
+              key: 'dxo',
+              label: 'DxO',
+              desc: 'Criteria, options, evaluations, risks, decision',
+              icon: '📊',
+            },
+            {
+              key: 'sequential',
+              label: 'Sequential',
+              desc: 'Iterative improvement passed through models',
+              icon: '🔁',
+            },
+            {
+              key: 'ensemble',
+              label: 'Ensemble',
+              desc: 'Independent outputs combined with weights',
+              icon: '🎛️',
+            },
+          ];
+          return (
+            <div className="mode-cards" role="radiogroup" aria-label="Collaboration mode">
+              {modes.map((m) => (
+                <button
+                  key={m.key}
+                  type="button"
+                  className={`mode-card ${mode === m.key ? 'active' : ''}`}
+                  role="radio"
+                  aria-checked={mode === m.key}
+                  onClick={() => onChangeMode && onChangeMode(m.key)}
+                  disabled={isLoading}
+                >
+                  <div className="mode-icon" aria-hidden="true">{m.icon}</div>
+                  <div className="mode-title">{m.label}</div>
+                  <div className="mode-desc">{m.desc}</div>
+                </button>
+              ))}
+            </div>
+          );
+        })()}
+        <div className="mode-hint">Selected: {mode.charAt(0).toUpperCase() + mode.slice(1)}</div>
       </div>
 
       <div 
