@@ -4,7 +4,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Dict, Any
 import uuid
 import json
@@ -19,6 +19,12 @@ from .council import (
     stage2_collect_rankings,
     stage3_synthesize_final,
     calculate_aggregate_rankings,
+)
+from .settings import (
+    get_all_settings_effective,
+    save_settings,
+    load_settings,
+    default_settings,
 )
 
 app = FastAPI(title="LLM Council API")
@@ -46,6 +52,8 @@ class SendMessageRequest(BaseModel):
     """Request to send a message in a conversation."""
 
     content: str
+    # Collaboration mode passed by frontend (e.g., 'council', 'dxo', 'sequential', 'ensemble')
+    mode: str | None = Field(default=None)
 
 
 class ConversationMetadata(BaseModel):
@@ -135,9 +143,12 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
         title = await generate_conversation_title(request.content)
         storage.update_conversation_title(conversation_id, title)
 
-    # Run the 3-stage council process
+    # Determine mode (fallback to 'council')
+    mode = (request.mode or "council").strip() or "council"
+
+    # Run the 3-stage council process for selected mode
     stage1_results, stage2_results, stage3_result, metadata = await run_full_council(
-        request.content
+        request.content, mode=mode
     )
 
     # Add assistant message with all stages
@@ -173,22 +184,25 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
             # Add user message
             storage.add_user_message(conversation_id, request.content)
 
+            # Determine mode (fallback to 'council')
+            mode = (request.mode or "council").strip() or "council"
+
             # Start title generation in parallel (don't await yet)
             title_task = None
             if is_first_message:
                 title_task = asyncio.create_task(
-                    generate_conversation_title(request.content)
+                    generate_conversation_title(request.content, mode=mode)
                 )
 
             # Stage 1: Collect responses
             yield f"data: {json.dumps({'type': 'stage1_start'})}\n\n"
-            stage1_results = await stage1_collect_responses(request.content)
+            stage1_results = await stage1_collect_responses(request.content, mode=mode)
             yield f"data: {json.dumps({'type': 'stage1_complete', 'data': stage1_results})}\n\n"
 
             # Stage 2: Collect rankings
             yield f"data: {json.dumps({'type': 'stage2_start'})}\n\n"
             stage2_results, label_to_model = await stage2_collect_rankings(
-                request.content, stage1_results
+                request.content, stage1_results, mode=mode
             )
             aggregate_rankings = calculate_aggregate_rankings(
                 stage2_results, label_to_model
@@ -206,7 +220,7 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
             # Stage 3: Synthesize final answer
             yield f"data: {json.dumps({'type': 'stage3_start'})}\n\n"
             stage3_result = await stage3_synthesize_final(
-                request.content, stage1_results, stage2_results
+                request.content, stage1_results, stage2_results, mode=mode
             )
             yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
 
@@ -236,6 +250,79 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
             "Connection": "keep-alive",
         },
     )
+
+
+# =============== Settings API ===============
+
+
+class CouncilModelConfig(BaseModel):
+    name: str
+    system_prompt: str | None = None
+
+
+class SettingsModel(BaseModel):
+    council_models: list[CouncilModelConfig]
+    chairman_model: str
+    title_model: str | None = None
+
+
+@app.get("/api/settings")
+def get_settings():
+    # Return effective settings for all modes plus legacy top-level
+    return get_all_settings_effective()
+
+
+@app.put("/api/settings")
+def update_settings(payload: Dict[str, Any]):
+    """Update settings supporting both legacy single-mode and new per-mode payloads.
+
+    Accepted payloads:
+    - Legacy: { council_models, chairman_model, title_model, mode? }
+      If 'mode' is provided, updates that mode block; else updates 'council'.
+    - Per-mode: { modes: { [mode]: { council_models, chairman_model, title_model } }, default_mode? }
+      Merges provided mode blocks with existing settings.
+    """
+    current = load_settings()
+    merged = {
+        "modes": current.get("modes") or default_settings().get("modes"),
+        "default_mode": current.get("default_mode") or "council",
+    }
+
+    if isinstance(payload, dict) and isinstance(payload.get("modes"), dict):
+        # Merge per-mode blocks
+        for mode_name, block in payload["modes"].items():
+            if not isinstance(block, dict):
+                continue
+            existing = merged["modes"].get(mode_name, {})
+            merged["modes"][mode_name] = {
+                **existing,
+                **{
+                    k: v
+                    for k, v in block.items()
+                    if k in ("council_models", "chairman_model", "title_model")
+                },
+            }
+        if (
+            isinstance(payload.get("default_mode"), str)
+            and payload["default_mode"].strip()
+        ):
+            merged["default_mode"] = payload["default_mode"].strip()
+    else:
+        # Legacy single-mode payload
+        target_mode = (payload.get("mode") or "council").strip() or "council"
+        block = {
+            "council_models": payload.get("council_models"),
+            "chairman_model": payload.get("chairman_model"),
+            "title_model": payload.get("title_model"),
+        }
+        existing = merged["modes"].get(target_mode, {})
+        merged["modes"][target_mode] = {
+            **existing,
+            **{k: v for k, v in block.items() if v is not None},
+        }
+
+    save_settings(merged)
+    return get_all_settings_effective()
 
 
 if __name__ == "__main__":

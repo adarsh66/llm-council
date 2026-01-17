@@ -1,0 +1,94 @@
+{
+  "modes": {
+    "council": {
+      "council_models": [
+        {
+          "name": "Phi-4",
+          "system_prompt": "Focus on data and statistics part of the problem"
+        },
+        {
+          "name": "gpt-5-mini",
+          "system_prompt": "You are fast thinker and will provide the most common man / obvious answer to any problem"
+        },
+        {
+          "name": "gpt-4.1",
+          "system_prompt": "You believe that history repeats itself , and will bias your judgement on inductive reasoning by pulling out similar events from history to support your answer"
+        },
+        {
+          "name": "DeepSeek-R1",
+          "system_prompt": "You are a deep reasoning agent that thinks through multiple aspects of the problem before solving for it"
+        }
+      ],
+      "chairman_model": "DeepSeek-R1",
+      "title_model": "gpt-5-mini"
+    },
+    "dxo": {
+      "council_models": [
+        {
+          "name": "Phi-4",
+          "system_prompt": "You will provide overall data analysis and help track the overall objectives of the task"
+        },
+        {
+          "name": "gpt-5-mini",
+          "system_prompt": "You will provide test the data against the hypothesis to validate it"
+        },
+        {
+          "name": "gpt-4.1",
+          "system_prompt": "You will provide list of data sources to validate the different hypotheses"
+        },
+        {
+          "name": "DeepSeek-R1",
+          "system_prompt": "You will provide critical review of the hypothesis and methodology"
+        },
+        {
+          "name": "gpt-5",
+          "system_prompt": "You will generate multiple hypotheses for the given problem and revise the hypotheses with feedback given "
+        }
+      ],
+      "chairman_model": "gpt-5",
+      "title_model": "gpt-5-mini"
+    },
+    "sequential": {
+      "council_models": [
+        {
+          "name": "gpt-5"
+        },
+        {
+          "name": "gpt-5-mini"
+        },
+        {
+          "name": "gpt-4.1"
+        },
+        {
+          "name": "DeepSeek-R1"
+        }
+      ],
+      "chairman_model": "gpt-5",
+      "title_model": "Phi-4"
+    },
+    "ensemble": {
+      "council_models": [
+        {
+          "name": "gpt-5",
+          "system_prompt": "You are a group task manager agent in charge of breaking down a problem and orchestrating between expert sub agents"
+        },
+        {
+          "name": "gpt-5-mini",
+          "system_prompt": "You are a human resource (HR) manager agent"
+        },
+        {
+          "name": "gpt-4.1",
+          "system_prompt": "You are the COO agent with expertise in business operations"
+        },
+        {
+          "name": "DeepSeek-R1",
+          "system_prompt": "You are the CTO and technology expert agent with deep skills in technical implementation, solutions and costing"
+        }
+      ],
+      "chairman_model": "gpt-5",
+      "title_model": "Phi-4"
+    }
+  },
+  "default_mode": "council",
+  "updated_at": "2026-01-17T14:22:55.692002+00:00"
+}

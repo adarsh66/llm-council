@@ -4,6 +4,7 @@ import Stage1 from './Stage1';
 import Stage2 from './Stage2';
 import Stage3 from './Stage3';
 import './ChatInterface.css';
+import Settings from './Settings';
 
 export default function ChatInterface({
   conversation,
@@ -13,6 +14,7 @@ export default function ChatInterface({
   onChangeMode,
 }) {
   const [input, setInput] = useState('');
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const textareaRef = useRef(null);
@@ -137,7 +139,17 @@ export default function ChatInterface({
             </div>
           );
         })()}
-        <div className="mode-hint">Selected: {mode.charAt(0).toUpperCase() + mode.slice(1)}</div>
+        <div className="mode-hint">
+          <span>Selected: {mode.charAt(0).toUpperCase() + mode.slice(1)}</span>
+          <button
+            type="button"
+            className="send-button"
+            style={{ marginLeft: 12 }}
+            onClick={() => setSettingsOpen(true)}
+          >
+            ⚙️ Settings
+          </button>
+        </div>
       </div>
 
       <div 
@@ -257,6 +269,8 @@ export default function ChatInterface({
           </button>
         </form>
       </div>
+
+      <Settings isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} mode={mode} />
     </div>
   );
 }

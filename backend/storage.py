@@ -6,7 +6,6 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 from .config import DATA_DIR
-from typing import Tuple
 
 
 def ensure_data_dir():
