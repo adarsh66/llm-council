@@ -1,29 +1,34 @@
-"""3-stage LLM Council orchestration."""
+"""LLM Council orchestration: 3-stage peer evaluation and synthesis."""
 
-from typing import List, Dict, Any, Tuple
+from __future__ import annotations
+
+from typing import Any, Dict, List, Tuple, AsyncGenerator
 import asyncio
-from .config import CHAIRMAN_MODEL, TITLE_MODEL
-from .settings import get_effective_settings
-from .orchestrators.common import build_agents, make_messages, run_agent
+import re
+from collections import defaultdict
+
+from ..settings import get_effective_settings
+from ..config import CHAIRMAN_MODEL, TITLE_MODEL
+from .. import storage
+from .common import build_agents, make_messages, run_agent
 
 
-async def stage1_collect_responses(
+async def run_stage1_council(
     user_query: str, mode: str = "council"
-) -> List[Dict[str, Any]]:
-    """
-    Stage 1: Collect individual responses from all council models.
+) -> Tuple[List, List]:
+    """Stage 1: Collect individual responses from all council models.
 
-    Args:
-        user_query: The user's question
-
-    Returns:
-        List of dicts with 'model' and 'response' keys
+    Returns (stage1_data, agents).
     """
-    effective = get_effective_settings(mode)
-    agents = build_agents(effective)
+    settings = get_effective_settings(mode)
+    agents = build_agents(settings)
+    if not agents:
+        return [], []
 
     async def _call(agent_cfg: Dict[str, Any]):
-        name = agent_cfg.get("name")
+        name = agent_cfg.get("name", "")
+        if not name:
+            return None, None
         sys_prompt = (agent_cfg.get("system_prompt") or "").strip()
         messages = make_messages(sys_prompt, user_query)
         resp = await run_agent(name, messages)
@@ -34,29 +39,23 @@ async def stage1_collect_responses(
     # Format results
     stage1_results = []
     for model, response in responses:
-        if response is not None:  # Only include successful responses
+        if response is not None:
             stage1_results.append(
                 {"model": model, "response": response.get("content", "")}
             )
 
-    return stage1_results
+    return stage1_results, agents
 
 
-async def stage2_collect_rankings(
-    user_query: str, stage1_results: List[Dict[str, Any]], mode: str = "council"
-) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
-    """
-    Stage 2: Each model ranks the anonymized responses.
+async def run_stage2_council(
+    user_query: str, stage1_results: List[Dict[str, Any]], agents: List
+) -> Tuple[List, Dict[str, str]]:
+    """Stage 2: Each model ranks the anonymized responses.
 
-    Args:
-        user_query: The original user query
-        stage1_results: Results from Stage 1
-
-    Returns:
-        Tuple of (rankings list, label_to_model mapping)
+    Returns (stage2_data, label_to_model_mapping).
     """
     # Create anonymized labels for responses (Response A, Response B, etc.)
-    labels = [chr(65 + i) for i in range(len(stage1_results))]  # A, B, C, ...
+    labels = [chr(65 + i) for i in range(len(stage1_results))]
 
     # Create mapping from label to model name
     label_to_model = {
@@ -103,24 +102,24 @@ FINAL RANKING:
 
 Now provide your evaluation and ranking:"""
 
-    effective = get_effective_settings(mode)
-    agents = build_agents(effective)
-
     async def _call(agent_cfg: Dict[str, Any]):
-        name = agent_cfg.get("name")
+        name = agent_cfg.get("name", "")
+        if not name:
+            return None, None
         sys_prompt = (agent_cfg.get("system_prompt") or "").strip()
         messages = make_messages(sys_prompt, ranking_prompt)
         resp = await run_agent(name, messages)
         return name, resp
 
     responses = await asyncio.gather(*[_call(a) for a in agents])
+    responses = [(n, r) for n, r in responses if n is not None]
 
     # Format results
     stage2_results = []
     for model, response in responses:
         if response is not None:
             full_text = response.get("content", "")
-            parsed = parse_ranking_from_text(full_text)
+            parsed = _parse_ranking_from_text(full_text)
             stage2_results.append(
                 {"model": model, "ranking": full_text, "parsed_ranking": parsed}
             )
@@ -128,22 +127,15 @@ Now provide your evaluation and ranking:"""
     return stage2_results, label_to_model
 
 
-async def stage3_synthesize_final(
+async def run_stage3_council(
     user_query: str,
     stage1_results: List[Dict[str, Any]],
     stage2_results: List[Dict[str, Any]],
-    mode: str = "council",
-) -> Dict[str, Any]:
-    """
-    Stage 3: Chairman synthesizes final response.
+    settings: Dict,
+) -> Tuple[Dict, Dict]:
+    """Stage 3: Chairman synthesizes final response.
 
-    Args:
-        user_query: The original user query
-        stage1_results: Individual model responses from Stage 1
-        stage2_results: Rankings from Stage 2
-
-    Returns:
-        Dict with 'model' and 'response' keys
+    Returns (stage3_data, metadata).
     """
     # Build comprehensive context for chairman
     stage1_text = "\n\n".join(
@@ -172,8 +164,7 @@ STAGE 2 - Peer Rankings:
 {stage2_text}
 
 Your task as Chairman is to synthesize all of this information into a single, comprehensive,
-accurate answer to the user's
-original question. Consider:
+accurate answer to the user's original question. Consider:
 - The individual responses and their insights
 - The peer rankings and what they reveal about response quality
 - Any patterns of agreement or disagreement
@@ -182,87 +173,58 @@ Provide a clear, well-reasoned final answer that represents the council's collec
 
     messages = make_messages(None, chairman_prompt)
 
-    # Query the chairman model (runtime settings fallback to config)
-    effective = get_effective_settings(mode)
-    chairman_model = effective.get("chairman_model") or CHAIRMAN_MODEL
+    # Query the chairman model
+    chairman_model = settings.get("chairman_model") or CHAIRMAN_MODEL
     response = await run_agent(chairman_model, messages)
 
     if response is None:
-        # Fallback if chairman fails
-        return {
+        stage3 = {
             "model": chairman_model,
             "response": "Error: Unable to generate final synthesis.",
         }
+    else:
+        stage3 = {"model": chairman_model, "response": response.get("content", "")}
 
-    return {"model": chairman_model, "response": response.get("content", "")}
+    metadata = {}
+    return stage3, metadata
 
 
-def parse_ranking_from_text(ranking_text: str) -> List[str]:
-    """
-    Parse the FINAL RANKING section from the model's response.
-
-    Args:
-        ranking_text: The full text response from the model
-
-    Returns:
-        List of response labels in ranked order
-    """
-    import re
-
-    # Look for "FINAL RANKING:" section
+def _parse_ranking_from_text(ranking_text: str) -> List[str]:
+    """Parse the FINAL RANKING section from model response."""
     if "FINAL RANKING:" in ranking_text:
-        # Extract everything after "FINAL RANKING:"
         parts = ranking_text.split("FINAL RANKING:")
         if len(parts) >= 2:
             ranking_section = parts[1]
-            # Try to extract numbered list format (e.g., "1. Response A")
-            # This pattern looks for: number, period, optional space, "Response X"
             numbered_matches = re.findall(r"\d+\.\s*Response [A-Z]", ranking_section)
             if numbered_matches:
-                # Extract just the "Response X" part
-                return [
-                    re.search(r"Response [A-Z]", m).group() for m in numbered_matches
-                ]
-
-            # Fallback: Extract all "Response X" patterns in order
+                result = []
+                for m in numbered_matches:
+                    match = re.search(r"Response [A-Z]", m)
+                    if match:
+                        result.append(match.group())
+                return result
             matches = re.findall(r"Response [A-Z]", ranking_section)
             return matches
 
-    # Fallback: try to find any "Response X" patterns in order
     matches = re.findall(r"Response [A-Z]", ranking_text)
     return matches
 
 
-def calculate_aggregate_rankings(
+def _calculate_aggregate_rankings(
     stage2_results: List[Dict[str, Any]], label_to_model: Dict[str, str]
 ) -> List[Dict[str, Any]]:
-    """
-    Calculate aggregate rankings across all models.
-
-    Args:
-        stage2_results: Rankings from each model
-        label_to_model: Mapping from anonymous labels to model names
-
-    Returns:
-        List of dicts with model name and average rank, sorted best to worst
-    """
-    from collections import defaultdict
-
-    # Track positions for each model
-    model_positions = defaultdict(list)
+    """Calculate aggregate rankings across all models."""
+    model_positions: Dict[str, List[int]] = defaultdict(list)
 
     for ranking in stage2_results:
         ranking_text = ranking["ranking"]
-
-        # Parse the ranking from the structured format
-        parsed_ranking = parse_ranking_from_text(ranking_text)
+        parsed_ranking = _parse_ranking_from_text(ranking_text)
 
         for position, label in enumerate(parsed_ranking, start=1):
             if label in label_to_model:
                 model_name = label_to_model[label]
                 model_positions[model_name].append(position)
 
-    # Calculate average position for each model
     aggregate = []
     for model, positions in model_positions.items():
         if positions:
@@ -275,22 +237,12 @@ def calculate_aggregate_rankings(
                 }
             )
 
-    # Sort by average rank (lower is better)
     aggregate.sort(key=lambda x: x["average_rank"])
-
     return aggregate
 
 
 async def generate_conversation_title(user_query: str, mode: str = "council") -> str:
-    """
-    Generate a short title for a conversation based on the first user message.
-
-    Args:
-        user_query: The first user message
-
-    Returns:
-        A short title (3-5 words)
-    """
+    """Generate a short title for a conversation based on the first user message."""
     title_prompt = f"""Generate a very short title (3-5 words maximum) that summarizes the following question.
 The title should be concise and descriptive. Do not use quotes or punctuation in the title.
 
@@ -300,44 +252,31 @@ Title:"""
 
     messages = make_messages(None, title_prompt)
 
-    # Use configured title model for title generation (fast and cheap)
-    effective = get_effective_settings(mode)
-    title_model = effective.get("title_model") or TITLE_MODEL
+    settings = get_effective_settings(mode)
+    title_model = settings.get("title_model") or TITLE_MODEL
     response = await run_agent(title_model, messages, timeout=30.0)
 
     if response is None:
-        # Fallback to a generic title
         return "New Conversation"
 
     title = response.get("content", "New Conversation").strip()
-
-    # Clean up the title - remove quotes, limit length
     title = title.strip("\"'")
 
-    # Truncate if too long
     if len(title) > 50:
         title = title[:47] + "..."
 
     return title
 
 
-async def run_full_council(
+async def run_council(
     user_query: str, mode: str = "council"
 ) -> Tuple[List, List, Dict, Dict]:
+    """Run the complete 3-stage council process.
+
+    Returns a tuple (stage1, stage2, stage3, metadata) compatible with non-stream API.
     """
-    Run the complete 3-stage council process.
-
-    Args:
-        user_query: The user's question
-
-    Returns:
-        Tuple of (stage1_results, stage2_results, stage3_result, metadata)
-    """
-    # Stage 1: Collect individual responses
-    stage1_results = await stage1_collect_responses(user_query, mode=mode)
-
-    # If no models responded successfully, return error
-    if not stage1_results:
+    s1, agents = await run_stage1_council(user_query, mode)
+    if not agents:
         return (
             [],
             [],
@@ -348,23 +287,47 @@ async def run_full_council(
             {},
         )
 
-    # Stage 2: Collect rankings
-    stage2_results, label_to_model = await stage2_collect_rankings(
-        user_query, stage1_results, mode=mode
-    )
+    s2, label_to_model = await run_stage2_council(user_query, s1, agents)
 
-    # Calculate aggregate rankings
-    aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
+    settings = get_effective_settings(mode)
+    s3, _ = await run_stage3_council(user_query, s1, s2, settings)
 
-    # Stage 3: Synthesize final answer
-    stage3_result = await stage3_synthesize_final(
-        user_query, stage1_results, stage2_results, mode=mode
-    )
-
-    # Prepare metadata
+    aggregate_rankings = _calculate_aggregate_rankings(s2, label_to_model)
     metadata = {
         "label_to_model": label_to_model,
         "aggregate_rankings": aggregate_rankings,
     }
 
-    return stage1_results, stage2_results, stage3_result, metadata
+    return s1, s2, s3, metadata
+
+
+async def stream_council(
+    conversation_id: str, user_query: str, mode: str = "council"
+) -> AsyncGenerator[Dict[str, Any], None]:
+    """Stream council stages via SSE events and persist assistant message when complete."""
+    # Stage 1: Collect responses
+    yield {"type": "stage1_start"}
+    s1, agents = await run_stage1_council(user_query, mode)
+    if not agents:
+        yield {"type": "error", "message": "All models failed to respond."}
+        return
+    yield {"type": "stage1_complete", "data": s1}
+
+    # Stage 2: Rankings
+    yield {"type": "stage2_start"}
+    s2, label_to_model = await run_stage2_council(user_query, s1, agents)
+    aggregate_rankings = _calculate_aggregate_rankings(s2, label_to_model)
+    metadata = {
+        "label_to_model": label_to_model,
+        "aggregate_rankings": aggregate_rankings,
+    }
+    yield {"type": "stage2_complete", "data": s2, "metadata": metadata}
+
+    # Stage 3: Synthesis
+    yield {"type": "stage3_start"}
+    settings = get_effective_settings(mode)
+    s3, _ = await run_stage3_council(user_query, s1, s2, settings)
+    yield {"type": "stage3_complete", "data": s3}
+
+    storage.add_assistant_message(conversation_id, s1, s2, s3)
+    yield {"type": "complete"}

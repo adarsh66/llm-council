@@ -12,14 +12,6 @@ import asyncio
 from pathlib import Path
 
 from . import storage
-from .council import (
-    run_full_council,
-    generate_conversation_title,
-    stage1_collect_responses,
-    stage2_collect_rankings,
-    stage3_synthesize_final,
-    calculate_aggregate_rankings,
-)
 from .orchestrators import (
     run_dxo,
     run_sequential,
@@ -27,6 +19,9 @@ from .orchestrators import (
     stream_dxo,
     stream_sequential,
     stream_ensemble,
+    run_council,
+    stream_council,
+    generate_conversation_title,
 )
 from .settings import (
     get_all_settings_effective,
@@ -156,8 +151,8 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
 
     # Dispatch by mode
     if mode == "council":
-        stage1_results, stage2_results, stage3_result, metadata = (
-            await run_full_council(request.content, mode=mode)
+        stage1_results, stage2_results, stage3_result, metadata = await run_council(
+            request.content, mode=mode
         )
     elif mode == "dxo":
         stage1_results, stage2_results, stage3_result, metadata = await run_dxo(
@@ -173,8 +168,8 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
         )
     else:
         # Fallback to council
-        stage1_results, stage2_results, stage3_result, metadata = (
-            await run_full_council(request.content, mode="council")
+        stage1_results, stage2_results, stage3_result, metadata = await run_council(
+            request.content, mode="council"
         )
 
     # Add assistant message with all stages
@@ -221,45 +216,11 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                 )
 
             if mode == "council":
-                # Stage 1: Collect responses
-                yield f"data: {json.dumps({'type': 'stage1_start'})}\n\n"
-                stage1_results = await stage1_collect_responses(
-                    request.content, mode=mode
-                )
-                yield f"data: {json.dumps({'type': 'stage1_complete', 'data': stage1_results})}\n\n"
-
-                # Stage 2: Collect rankings
-                yield f"data: {json.dumps({'type': 'stage2_start'})}\n\n"
-                stage2_results, label_to_model = await stage2_collect_rankings(
-                    request.content, stage1_results, mode=mode
-                )
-                aggregate_rankings = calculate_aggregate_rankings(
-                    stage2_results, label_to_model
-                )
-                stage2_payload = {
-                    "type": "stage2_complete",
-                    "data": stage2_results,
-                    "metadata": {
-                        "label_to_model": label_to_model,
-                        "aggregate_rankings": aggregate_rankings,
-                    },
-                }
-                yield f"data: {json.dumps(stage2_payload)}\n\n"
-
-                # Stage 3: Synthesize final answer
-                yield f"data: {json.dumps({'type': 'stage3_start'})}\n\n"
-                stage3_result = await stage3_synthesize_final(
-                    request.content, stage1_results, stage2_results, mode=mode
-                )
-                yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
-
-                # Save complete assistant message
-                storage.add_assistant_message(
-                    conversation_id, stage1_results, stage2_results, stage3_result
-                )
-
-                # Send completion event
-                yield f"data: {json.dumps({'type': 'complete'})}\n\n"
+                # Use stream_council for proper streaming
+                async for event in stream_council(
+                    conversation_id, request.content, mode=mode
+                ):
+                    yield f"data: {json.dumps(event)}\n\n"
             else:
                 # Delegate to mode-specific streaming
                 if mode == "dxo":
