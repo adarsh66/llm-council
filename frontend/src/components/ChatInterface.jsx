@@ -2,6 +2,9 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import Stage1 from './Stage1';
 import Stage2 from './Stage2';
+import Stage2DXO from './Stage2DXO';
+import Stage2Sequential from './Stage2Sequential';
+import Stage2Ensemble from './Stage2Ensemble';
 import Stage3 from './Stage3';
 import './ChatInterface.css';
 import Settings from './Settings';
@@ -210,11 +213,19 @@ export default function ChatInterface({
                           </div>
                         )}
                         {msg.stage2 && (
-                          <Stage2
-                            rankings={msg.stage2}
-                            labelToModel={msg.metadata?.label_to_model}
-                            aggregateRankings={msg.metadata?.aggregate_rankings}
-                          />
+                          mode === 'council' ? (
+                            <Stage2
+                              rankings={msg.stage2}
+                              labelToModel={msg.metadata?.label_to_model}
+                              aggregateRankings={msg.metadata?.aggregate_rankings}
+                            />
+                          ) : mode === 'dxo' ? (
+                            <Stage2DXO data={msg.stage2} />
+                          ) : mode === 'sequential' ? (
+                            <Stage2Sequential steps={msg.stage2} />
+                          ) : (
+                            <Stage2Ensemble scores={msg.stage2} />
+                          )
                         )}
 
                         {/* Stage 3 */}
@@ -224,7 +235,7 @@ export default function ChatInterface({
                             <span>Synthesizing final answer...</span>
                           </div>
                         )}
-                        {msg.stage3 && <Stage3 finalResponse={msg.stage3} />}
+                        {msg.stage3 && <Stage3 finalResponse={msg.stage3} mode={mode} />}
                       </div>
                     </div>
                   )}

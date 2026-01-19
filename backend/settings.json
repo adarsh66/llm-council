@@ -51,20 +51,14 @@
     "sequential": {
       "council_models": [
         {
-          "name": "gpt-5"
-        },
-        {
           "name": "gpt-5-mini"
         },
         {
           "name": "gpt-4.1"
-        },
-        {
-          "name": "DeepSeek-R1"
         }
       ],
       "chairman_model": "gpt-5",
-      "title_model": "Phi-4"
+      "title_model": "gpt-4.1"
     },
     "ensemble": {
       "council_models": [
@@ -90,5 +84,5 @@
     }
   },
   "default_mode": "council",
-  "updated_at": "2026-01-17T14:22:55.692002+00:00"
+  "updated_at": "2026-01-19T14:56:51.620657+00:00"
 }

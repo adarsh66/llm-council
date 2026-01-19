@@ -13,4 +13,5 @@ dependencies = [
     "aiohttp>=3.9.0",
     "pydantic>=2.9.0",
     "aiofiles>=25.1.0",
+    "agent-framework>=1.0.0b251120",
 ]

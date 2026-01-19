@@ -1,7 +1,7 @@
 import ReactMarkdown from 'react-markdown';
 import './Stage3.css';
 
-export default function Stage3({ finalResponse }) {
+export default function Stage3({ finalResponse, mode = 'council' }) {
   if (!finalResponse) {
     return null;
   }
@@ -10,7 +10,7 @@ export default function Stage3({ finalResponse }) {
     <div className="stage stage3">
       <div className="stage-header">
         <h3 className="stage-title">
-          Stage 3: Final Council Answer
+          Stage 3: Final {mode === 'council' ? 'Council ' : ''}Answer
           <span className="stage-badge">Synthesized</span>
         </h3>
       </div>

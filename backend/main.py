@@ -20,6 +20,14 @@ from .council import (
     stage3_synthesize_final,
     calculate_aggregate_rankings,
 )
+from .orchestrators import (
+    run_dxo,
+    run_sequential,
+    run_ensemble,
+    stream_dxo,
+    stream_sequential,
+    stream_ensemble,
+)
 from .settings import (
     get_all_settings_effective,
     save_settings,
@@ -146,10 +154,28 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
     # Determine mode (fallback to 'council')
     mode = (request.mode or "council").strip() or "council"
 
-    # Run the 3-stage council process for selected mode
-    stage1_results, stage2_results, stage3_result, metadata = await run_full_council(
-        request.content, mode=mode
-    )
+    # Dispatch by mode
+    if mode == "council":
+        stage1_results, stage2_results, stage3_result, metadata = (
+            await run_full_council(request.content, mode=mode)
+        )
+    elif mode == "dxo":
+        stage1_results, stage2_results, stage3_result, metadata = await run_dxo(
+            request.content, mode=mode
+        )
+    elif mode == "sequential":
+        stage1_results, stage2_results, stage3_result, metadata = await run_sequential(
+            request.content, mode=mode
+        )
+    elif mode == "ensemble":
+        stage1_results, stage2_results, stage3_result, metadata = await run_ensemble(
+            request.content, mode=mode
+        )
+    else:
+        # Fallback to council
+        stage1_results, stage2_results, stage3_result, metadata = (
+            await run_full_council(request.content, mode="council")
+        )
 
     # Add assistant message with all stages
     storage.add_assistant_message(
@@ -194,35 +220,69 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                     generate_conversation_title(request.content, mode=mode)
                 )
 
-            # Stage 1: Collect responses
-            yield f"data: {json.dumps({'type': 'stage1_start'})}\n\n"
-            stage1_results = await stage1_collect_responses(request.content, mode=mode)
-            yield f"data: {json.dumps({'type': 'stage1_complete', 'data': stage1_results})}\n\n"
+            if mode == "council":
+                # Stage 1: Collect responses
+                yield f"data: {json.dumps({'type': 'stage1_start'})}\n\n"
+                stage1_results = await stage1_collect_responses(
+                    request.content, mode=mode
+                )
+                yield f"data: {json.dumps({'type': 'stage1_complete', 'data': stage1_results})}\n\n"
 
-            # Stage 2: Collect rankings
-            yield f"data: {json.dumps({'type': 'stage2_start'})}\n\n"
-            stage2_results, label_to_model = await stage2_collect_rankings(
-                request.content, stage1_results, mode=mode
-            )
-            aggregate_rankings = calculate_aggregate_rankings(
-                stage2_results, label_to_model
-            )
-            stage2_payload = {
-                "type": "stage2_complete",
-                "data": stage2_results,
-                "metadata": {
-                    "label_to_model": label_to_model,
-                    "aggregate_rankings": aggregate_rankings,
-                },
-            }
-            yield f"data: {json.dumps(stage2_payload)}\n\n"
+                # Stage 2: Collect rankings
+                yield f"data: {json.dumps({'type': 'stage2_start'})}\n\n"
+                stage2_results, label_to_model = await stage2_collect_rankings(
+                    request.content, stage1_results, mode=mode
+                )
+                aggregate_rankings = calculate_aggregate_rankings(
+                    stage2_results, label_to_model
+                )
+                stage2_payload = {
+                    "type": "stage2_complete",
+                    "data": stage2_results,
+                    "metadata": {
+                        "label_to_model": label_to_model,
+                        "aggregate_rankings": aggregate_rankings,
+                    },
+                }
+                yield f"data: {json.dumps(stage2_payload)}\n\n"
 
-            # Stage 3: Synthesize final answer
-            yield f"data: {json.dumps({'type': 'stage3_start'})}\n\n"
-            stage3_result = await stage3_synthesize_final(
-                request.content, stage1_results, stage2_results, mode=mode
-            )
-            yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
+                # Stage 3: Synthesize final answer
+                yield f"data: {json.dumps({'type': 'stage3_start'})}\n\n"
+                stage3_result = await stage3_synthesize_final(
+                    request.content, stage1_results, stage2_results, mode=mode
+                )
+                yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
+
+                # Save complete assistant message
+                storage.add_assistant_message(
+                    conversation_id, stage1_results, stage2_results, stage3_result
+                )
+
+                # Send completion event
+                yield f"data: {json.dumps({'type': 'complete'})}\n\n"
+            else:
+                # Delegate to mode-specific streaming
+                if mode == "dxo":
+                    async for evt in stream_dxo(
+                        conversation_id, request.content, mode=mode
+                    ):
+                        yield f"data: {json.dumps(evt)}\n\n"
+                elif mode == "sequential":
+                    async for evt in stream_sequential(
+                        conversation_id, request.content, mode=mode
+                    ):
+                        yield f"data: {json.dumps(evt)}\n\n"
+                elif mode == "ensemble":
+                    async for evt in stream_ensemble(
+                        conversation_id, request.content, mode=mode
+                    ):
+                        yield f"data: {json.dumps(evt)}\n\n"
+                else:
+                    # Fallback: council
+                    async for evt in stream_ensemble(
+                        conversation_id, request.content, mode="ensemble"
+                    ):
+                        yield f"data: {json.dumps(evt)}\n\n"
 
             # Wait for title generation if it was started
             if title_task:
@@ -230,13 +290,7 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                 storage.update_conversation_title(conversation_id, title)
                 yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
 
-            # Save complete assistant message
-            storage.add_assistant_message(
-                conversation_id, stage1_results, stage2_results, stage3_result
-            )
-
-            # Send completion event
-            yield f"data: {json.dumps({'type': 'complete'})}\n\n"
+            # Note: non-council streams persist internally in orchestrators.
 
         except Exception as e:
             # Send error event

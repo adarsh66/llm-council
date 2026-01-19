@@ -2,9 +2,9 @@
 
 from typing import List, Dict, Any, Tuple
 import asyncio
-from .azure_inference import query_model
-from .config import COUNCIL_MODELS, CHAIRMAN_MODEL, TITLE_MODEL
+from .config import CHAIRMAN_MODEL, TITLE_MODEL
 from .settings import get_effective_settings
+from .orchestrators.common import build_agents, make_messages, run_agent
 
 
 async def stage1_collect_responses(
@@ -20,21 +20,16 @@ async def stage1_collect_responses(
         List of dicts with 'model' and 'response' keys
     """
     effective = get_effective_settings(mode)
-    council_models = effective.get("council_models", []) or [
-        {"name": m} for m in COUNCIL_MODELS
-    ]
+    agents = build_agents(effective)
 
-    async def _call(model_cfg: Dict[str, Any]):
-        name = model_cfg.get("name")
-        sys_prompt = (model_cfg.get("system_prompt") or "").strip()
-        messages = []
-        if sys_prompt:
-            messages.append({"role": "system", "content": sys_prompt})
-        messages.append({"role": "user", "content": user_query})
-        resp = await query_model(name, messages)
+    async def _call(agent_cfg: Dict[str, Any]):
+        name = agent_cfg.get("name")
+        sys_prompt = (agent_cfg.get("system_prompt") or "").strip()
+        messages = make_messages(sys_prompt, user_query)
+        resp = await run_agent(name, messages)
         return name, resp
 
-    responses = await asyncio.gather(*[_call(m) for m in council_models])
+    responses = await asyncio.gather(*[_call(a) for a in agents])
 
     # Format results
     stage1_results = []
@@ -109,21 +104,16 @@ FINAL RANKING:
 Now provide your evaluation and ranking:"""
 
     effective = get_effective_settings(mode)
-    council_models = effective.get("council_models", []) or [
-        {"name": m} for m in COUNCIL_MODELS
-    ]
+    agents = build_agents(effective)
 
-    async def _call(model_cfg: Dict[str, Any]):
-        name = model_cfg.get("name")
-        sys_prompt = (model_cfg.get("system_prompt") or "").strip()
-        messages = []
-        if sys_prompt:
-            messages.append({"role": "system", "content": sys_prompt})
-        messages.append({"role": "user", "content": ranking_prompt})
-        resp = await query_model(name, messages)
+    async def _call(agent_cfg: Dict[str, Any]):
+        name = agent_cfg.get("name")
+        sys_prompt = (agent_cfg.get("system_prompt") or "").strip()
+        messages = make_messages(sys_prompt, ranking_prompt)
+        resp = await run_agent(name, messages)
         return name, resp
 
-    responses = await asyncio.gather(*[_call(m) for m in council_models])
+    responses = await asyncio.gather(*[_call(a) for a in agents])
 
     # Format results
     stage2_results = []
@@ -170,7 +160,8 @@ async def stage3_synthesize_final(
         ]
     )
 
-    chairman_prompt = f"""You are the Chairman of an LLM Council. Multiple AI models have provided responses to a user's question, and then ranked each other's responses.
+    chairman_prompt = f"""You are the Chairman of an LLM Council. Multiple AI models have provided responses to a user's
+question, and then ranked each other's responses.
 
 Original Question: {user_query}
 
@@ -180,19 +171,21 @@ STAGE 1 - Individual Responses:
 STAGE 2 - Peer Rankings:
 {stage2_text}
 
-Your task as Chairman is to synthesize all of this information into a single, comprehensive, accurate answer to the user's original question. Consider:
+Your task as Chairman is to synthesize all of this information into a single, comprehensive,
+accurate answer to the user's
+original question. Consider:
 - The individual responses and their insights
 - The peer rankings and what they reveal about response quality
 - Any patterns of agreement or disagreement
 
 Provide a clear, well-reasoned final answer that represents the council's collective wisdom:"""
 
-    messages = [{"role": "user", "content": chairman_prompt}]
+    messages = make_messages(None, chairman_prompt)
 
     # Query the chairman model (runtime settings fallback to config)
     effective = get_effective_settings(mode)
     chairman_model = effective.get("chairman_model") or CHAIRMAN_MODEL
-    response = await query_model(chairman_model, messages)
+    response = await run_agent(chairman_model, messages)
 
     if response is None:
         # Fallback if chairman fails
@@ -305,12 +298,12 @@ Question: {user_query}
 
 Title:"""
 
-    messages = [{"role": "user", "content": title_prompt}]
+    messages = make_messages(None, title_prompt)
 
     # Use configured title model for title generation (fast and cheap)
     effective = get_effective_settings(mode)
     title_model = effective.get("title_model") or TITLE_MODEL
-    response = await query_model(title_model, messages, timeout=30.0)
+    response = await run_agent(title_model, messages, timeout=30.0)
 
     if response is None:
         # Fallback to a generic title
