@@ -14,6 +14,11 @@ try:
         AgentRunUpdateEvent,
         WorkflowRunState,
         WorkflowStatusEvent,
+        ConcurrentBuilder,
+        SequentialBuilder,
+        MagenticBuilder,
+        GroupChatBuilder,
+        
     )
     from azure.ai.inference.aio import ChatCompletionsClient
     from azure.identity.aio import DefaultAzureCredential
